@@ -34,6 +34,30 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
+        <!-- 与 AI-Meeting 一致的 Resilience4j 版本：只引入核心组件，
+             不混用面向 Spring Boot 3 的自动配置 starter。 -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <!-- Semaphore Bulkhead：限制同时进入模拟 AI 的请求数量 -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-bulkhead</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <!-- AI Guard 实验：重试与超时，使用核心库，与现有组件同版本 -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-timelimiter</artifactId>
+            <version>2.2.0</version>
+        </dependency>
 
         <dependency>
             <groupId>org.projectlombok</groupId>
