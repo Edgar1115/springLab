@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>0001 · CircuitBreaker 速查</title><link rel="stylesheet" href="../assets/lesson.css"></head>
+<body><main>
+<header><div class="kicker">SpringLab / Teach · Reference 0001</div><h1>CircuitBreaker 执行与状态速查</h1>
+<p class="lede">看到装饰器、HALF_OPEN、AtomicInteger 或 FAILED/BLOCKED 的时候，用这一页迅速定位概念。</p></header>
+<h2>一眼看懂执行顺序</h2>
+<pre><code>originalAiCall = () -&gt; { ... };   // 创建任务，不执行
+decorated = CircuitBreaker.decorateCallable(cb, originalAiCall);
+// 执行时才检查许可（不是包装时）
+result = decorated.call();
+// 获准 → 执行原任务 → 记录结果
+// 拒绝 → CallNotPermittedException，原任务不会执行</code></pre>
+<h2>状态 + 许可</h2>
+<table><thead><tr><th>状态</th><th>是否执行</th><th>下一步</th></tr></thead><tbody>
+<tr><td><strong>CLOSED</strong></td><td>正常允许</td><td>最少 4 次，失败率 ≥ 50% → OPEN</td></tr>
+<tr><td><strong>OPEN</strong></td><td>直接拒绝</td><td>达到等待时间后，下一次请求可触发 HALF_OPEN</td></tr>
+<tr><td><strong>HALF_OPEN</strong></td><td>只允许 2 次试探许可</td><td>两次结果完成后评估是否 CLOSED/OPEN</td></tr>
+</tbody></table>
+<h2>结果分类</h2>
+<div class="grid">
+<section class="card"><h3>SUCCESS</h3><p>执行了原任务，正常返回。</p></section>
+<section class="card"><h3>FAILED</h3><p>执行了原任务，抛出异常。</p></section>
+<section class="card"><h3>BLOCKED</h3><p>没有许可，原任务没执行。</p></section>
+</div>
+<div class="note important">第 4 次失败而触发 OPEN：<strong>第 4 次 FAILED，第 5 次（立即到来）BLOCKED</strong>。异常先被装饰层统计，后被业务代码捕获。</div>
+<h2>HALF_OPEN：一轮两次，不循环补位</h2>
+<p>A 获许可并成功，B 获许可仍执行中；C 到来时仍 <strong>BLOCKED</strong>。两个名额限制本轮试探总次数，不等同于 Bulkhead 的可复用并发槽位。</p>
+<h2>AtomicInteger</h2>
+<table><thead><tr><th>表达式</th><th>含义</th></tr></thead><tbody>
+<tr><td><code>new AtomicInteger()</code></td><td>初值 0</td></tr>
+<tr><td><code>incrementAndGet()</code></td><td>原子加 1，返回新值</td></tr>
+<tr><td><code>getAndIncrement()</code></td><td>返回旧值，随后原子加 1</td></tr>
+<tr><td><code>get()</code> / <code>set(0)</code></td><td>读取 / 置零</td></tr>
+</tbody></table>
+<p class="muted">单个原子操作是安全的，多步组合不自动原子；仅同一 JVM 内共享，跨实例要用共享存储。</p>
+<h2>实验关键参数</h2>
+<p><code>COUNT_BASED</code> · <code>slidingWindowSize=4</code> · <code>minimumNumberOfCalls=4</code> · <code>failureRateThreshold=50%</code> · <code>waitDurationInOpenState=5s</code> · <code>permittedNumberOfCallsInHalfOpenState=2</code></p>
+<h2>继续阅读</h2><p><a href="../learning-records/0001-circuitbreaker-execution-and-state.md">详细笔记和易错题</a> · <a href="../lessons/0001-circuitbreaker-permission.html">6 分钟复习课</a> · <a href="../../CircuitBreaker-实验.md">HTTP 实验指南</a></p>
+<footer>来源：本仓库 CircuitBreakerLabService / CircuitBreakerLabController · <a href="https://resilience4j.readme.io/docs/circuitbreaker">Resilience4j 官方文档</a> · <a href="https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/concurrent/atomic/AtomicInteger.html">Oracle AtomicInteger 文档</a>。打印模式已适配。</footer>
+</main></body></html>

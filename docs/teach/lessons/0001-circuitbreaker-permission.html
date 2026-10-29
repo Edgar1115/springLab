@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>0001 · CircuitBreaker：包装、执行许可与 HALF_OPEN</title>
+<link rel="stylesheet" href="../assets/lesson.css"><script src="../assets/quiz.js" defer></script></head>
+<body><main>
+<header><div class="kicker">SpringLab / Teach · 微课 0001</div>
+<h1>熔断器在什么时候决定放行？</h1>
+<p class="lede">目标：通过三个请求的时序，区分「包装任务」「申请执行许可」「任务成功」以及 HALF_OPEN 的两个试探名额。</p>
+<p class="tag">约 6 分钟 · 适用于 springLab 的 Resilience4j 2.2.0 实验</p></header>
+<h2>先记住一条调用链</h2>
+<div class="flow">CircuitBreaker.decorateCallable(cb, originalAiCall)<br><small>只创建有保护的 Callable；不会运行原任务</small></div>
+<div class="arrow">↓</div>
+<div class="flow">decorated.call()<br><small>此刻获取许可：按执行时熔断器状态判断</small></div>
+<div class="arrow">↓</div>
+<div class="grid"><section class="card"><h3>获准</h3><p>执行 originalAiCall，装饰层把返回或异常报告给 CircuitBreaker。</p></section>
+<section class="card"><h3>未获准</h3><p>抛出 CallNotPermittedException；原任务不运行。</p></section></div>
+<div class="note important"><strong>允许执行 ≠ 执行成功。</strong> CLOSED 能放行一个最后失败的请求；HALF_OPEN 也不是放行所有请求。</div>
+<h2>结合当前实验的参数</h2>
+<table><thead><tr><th>规则</th><th>值</th><th>如何理解</th></tr></thead><tbody>
+<tr><td>统计窗口</td><td>4 次</td><td>最近已完成的 4 次调用</td></tr>
+<tr><td>最少调用数</td><td>4 次</td><td>未到 4 次不按失败率熔断</td></tr>
+<tr><td>失败率阈值</td><td>50%</td><td>四次中两次失败即可 OPEN</td></tr>
+<tr><td>OPEN 等待</td><td>5 秒</td><td>默认由等待后到来的请求触发 HALF_OPEN 探测</td></tr>
+<tr><td>HALF_OPEN 名额</td><td>2 次</td><td><strong>本轮总试探许可</strong>，不是可循环复用的并发槽位</td></tr>
+</tbody></table>
+<h2>两个最容易答错的时序</h2>
+<section class="card"><h3>时序 A · 哪一次是 FAILED？</h3>
+<p>第 4 次请求运行时仍为 CLOSED，执行失败后熔断器统计到失败率达标，进入 OPEN。<strong>第 4 次 = FAILED；立即到来的第 5 次 = BLOCKED。</strong></p></section>
+<section class="card" style="margin-top:12px"><h3>时序 B · A 成功后 C 能运行吗？</h3>
+<p>HALF_OPEN 发放两个试探许可：A 已成功，B 正在执行。新请求 C 仍被拒绝，因为两次许可均已使用；A 正常完成并不把试探名额归还给 C。</p>
+<p>当 A、B 两次结果都完成且均成功时，恢复 CLOSED；一次成功一次失败时，50% 失败率满足阈值，重新 OPEN。</p></section>
+<h2>自测（先想，再点击）</h2>
+<section class="question" data-quiz-answer="1" data-explanation=" 两个试探许可已发放，不会因 A 成功而补充新的许可。">
+<p>① HALF_OPEN 允许 2 次试探：A 成功、B 仍运行，C 会被怎样处理？</p>
+<div class="answers"><button type="button" data-choice="0" aria-pressed="false">允许</button><button type="button" data-choice="1" aria-pressed="false">拒绝</button></div><p class="feedback" aria-live="polite">选择你的答案。</p>
+</section>
+<section class="question" data-quiz-answer="0" data-explanation=" 第 4 次已经执行，只是在执行结束后触发熔断。">
+<p>② 第 4 次请求执行失败，并把熔断器切换为 OPEN。它本身的结果是？</p>
+<div class="answers"><button type="button" data-choice="0" aria-pressed="false">失败</button><button type="button" data-choice="1" aria-pressed="false">拦截</button></div><p class="feedback" aria-live="polite">选择你的答案。</p>
+</section>
+<section class="question" data-quiz-answer="1" data-explanation=" 包装不冻结状态；真正的许可检查发生在 decorated.call()。">
+<p>③ 包装时 CLOSED，调用时仍在等待期内的 OPEN。原任务是否执行？</p>
+<div class="answers"><button type="button" data-choice="0" aria-pressed="false">执行</button><button type="button" data-choice="1" aria-pressed="false">拒绝</button></div><p class="feedback" aria-live="polite">选择你的答案。</p>
+</section>
+<h2>立即在代码里核实</h2>
+<ol><li>打开 <a href="../../../src/main/java/com/edgar/springlab/circuitbreaker/CircuitBreakerLabService.java">CircuitBreakerLabService.java</a>，找 <code>decorateCallable</code> 和 <code>decorated.call()</code>。</li>
+<li>运行项目，参考 <a href="../../CircuitBreaker-实验.md">已有实验步骤</a>，观察 <code>stateBefore</code>、<code>state</code>、<code>outcome</code>、<code>actualAiCalls</code>。</li>
+<li>间隔一天再不看答案做一遍上方三个时序题。</li></ol>
+<div class="note success"><strong>复习与后续：</strong><a href="../learning-records/0001-circuitbreaker-execution-and-state.md">本次完整学习记录</a> · <a href="../reference/0001-circuitbreaker-reference.html">一页速查</a>。对任一状态转换不确定时，可以继续问学习助手；不用急于深入底层源码。</div>
+<footer>主要资料：<a href="https://resilience4j.readme.io/docs/circuitbreaker">Resilience4j 官方 CircuitBreaker 文档</a> · <a href="https://resilience4j.readme.io/docs/examples">官方装饰用法示例</a>。实验参数以 springLab 本地源码为准。</footer>
+</main></body></html>
